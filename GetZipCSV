@@ -1,0 +1,55 @@
+public Stream GetZipCSV<t>(List<t> obj,string name)
+        {
+            try
+            {
+                var baseOutputStream = new MemoryStream();
+                using (var zipStream = new ZipOutputStream(baseOutputStream))
+                {
+                    zipStream.IsStreamOwner = false;
+
+                    /** Higher compression level will calouse higher usage of resources
+                    * If not necessary do not use highest level 9 */
+                    zipStream.SetLevel(9);
+
+                    var buffer = new byte[4096];
+
+                    Int32 page = (obj.Count() / 10000) + 1;
+                    List<List<t>> ts = new List<List<t>>();
+                    for (int i = 1; i <= page; i++)
+                    {
+                        List<t> a = obj.Skip((i - 1) * 10000).Take(10000).ToList();
+                        var entry = new ZipEntry($"{name}_{i}.csv") { DateTime = DateTimeMethods.GetUTCDateTime() };
+
+                        zipStream.PutNextEntry(entry);
+                        using (MemoryStream inStream = new MemoryStream(ReadFully(a)))
+                        {
+                            StreamUtils.Copy(inStream, zipStream, buffer);
+                            inStream.Close();
+                        }
+                    }
+                    zipStream.Finish();
+                    zipStream.Close();
+                }
+                return baseOutputStream;
+            }
+            catch (Exception ex)
+            {
+                ExceptionHelper.HandleException(ex);
+            }
+            return null;
+        }
+        
+        
+   public byte[] ReadFully<t>(List<t> input)
+        {
+            byte[] buffer = new byte[4096];
+            using (var memoryStream = new MemoryStream())
+            using (var streamWriter = new StreamWriter(memoryStream))
+            using (var csvWriter = new CsvWriter(streamWriter))
+            {
+                csvWriter.WriteRecords(input);
+                streamWriter.Flush();
+                return memoryStream.ToArray();
+            }
+        }     
+        
